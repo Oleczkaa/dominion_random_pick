@@ -9,11 +9,12 @@ conn = sqlite3.connect(DB)
 st.title("Dominion Kingdom Generator")
 
 # Load available sets and types for the UI
+excluded_types = ['Treasure', 'Victory']
 df_sets = pd.read_sql_query("SELECT DISTINCT set_name FROM card_sets ORDER BY set_name", conn)
 df_types = pd.read_sql_query("SELECT DISTINCT type FROM card_types ORDER BY type", conn)
 
 all_sets = sorted(df_sets["set_name"].tolist())
-all_types = sorted(df_types["type"].tolist())
+all_types = sorted([t for t in df_types["type"].tolist() if t not in excluded_types])
 
 # --- Streamlit UI ---
 selected_sets = st.multiselect("Choose expansions:", all_sets)
@@ -46,6 +47,7 @@ if st.button("Generate Kingdom"):
         )
         """.format(",".join(["?"] * len(selected_types)))
         params += selected_types
+
 
     # Randomize and limit number of cards
     query += " ORDER BY RANDOM() LIMIT ?"

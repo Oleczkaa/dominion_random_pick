@@ -25,7 +25,7 @@ num_cards = st.slider("How many cards do you want?", 1, 15, 10)
 if st.button("Generate Kingdom"):
     # SQL query to select matching cards
     query = """
-    SELECT DISTINCT c.id, c.name, c.types, c.cost, cs.set_name
+    SELECT DISTINCT c.id, c.name, c.types, c.cost, cs.set_name, c.text
     FROM cards c
     JOIN card_sets cs ON c.id = cs.card_id
     JOIN card_types ct ON c.id = ct.card_id

@@ -2,11 +2,33 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 
+
 # Connect to your Dominion database
 DB = "dominion.db"
 conn = sqlite3.connect(DB)
 
+
 st.title("Dominion Kingdom Generator")
+
+st.markdown("""
+<style>
+
+/* Wrap text inside cells for data_editor */
+[data-testid="stDataEditor"] .st-emotion-cache-1w6p3tc td {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Allow row height to expand */
+[data-testid="stDataEditor"] .st-emotion-cache-1w6p3tc tr {
+    height: auto !important;
+    min-height: 40px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 
 # Load available sets and types for the UI
 excluded_types = ['Treasure', 'Victory']
@@ -61,8 +83,21 @@ if st.button("Generate Kingdom"):
     else:
         st.subheader("🎴 Generated Kingdom")
         # Display table
-        st.dataframe(results[["name", "types", "set_name", "cost"]])
-        
+        #st.dataframe(results[["name", "types", "set_name", "cost", "text"]])
+        st.data_editor(
+            results[["name", "types", "set_name", "cost", "text"]],
+            column_config={
+                "text": st.column_config.TextColumn(
+                    "Card Text",
+                    max_chars=500,
+                    help="Effect text (auto-wrapped)"
+                )
+                
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
         # Pretty list output
         st.markdown("### Card List:")
         for _, row in results.iterrows():

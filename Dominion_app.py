@@ -89,7 +89,7 @@ if st.button("Generate Kingdom"):
             column_config={
                 "text": st.column_config.TextColumn(
                     "Card Text",
-                    max_chars=500,
+                    max_chars=1800,
                     help="Effect text (auto-wrapped)"
                 )
                 

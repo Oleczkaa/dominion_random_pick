@@ -31,7 +31,7 @@ st.markdown("""
 
 
 # Load available sets and types for the UI
-excluded_types = ['Treasure', 'Victory']
+excluded_types = ['Event']
 df_sets = pd.read_sql_query("SELECT DISTINCT set_name FROM card_sets ORDER BY set_name", conn)
 df_types = pd.read_sql_query("SELECT DISTINCT type FROM card_types ORDER BY type", conn)
 

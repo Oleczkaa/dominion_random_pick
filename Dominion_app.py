@@ -10,28 +10,8 @@ conn = sqlite3.connect(DB)
 
 st.title("Dominion Kingdom Generator")
 
-st.markdown("""
-<style>
-
-/* Wrap text inside cells for data_editor */
-[data-testid="stDataEditor"] .st-emotion-cache-1w6p3tc td {
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    overflow-wrap: break-word !important;
-}
-
-/* Allow row height to expand */
-[data-testid="stDataEditor"] .st-emotion-cache-1w6p3tc tr {
-    height: auto !important;
-    min-height: 40px !important;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
 # Load available sets and types for the UI
-excluded_types = ['Event']
+excluded_types = ['Event', 'Curse']
 df_sets = pd.read_sql_query("SELECT DISTINCT set_name FROM card_sets ORDER BY set_name", conn)
 df_types = pd.read_sql_query("SELECT DISTINCT type FROM card_types ORDER BY type", conn)
 

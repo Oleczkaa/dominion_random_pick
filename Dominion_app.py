@@ -22,7 +22,8 @@ excluded_card_names = [
     'Province',
     'Gardens',
     'Colony',
-    'Curse'
+    'Curse',
+    'Platinum'
 ]
 
 df_sets = pd.read_sql_query("SELECT DISTINCT set_name FROM card_sets ORDER BY set_name", conn)

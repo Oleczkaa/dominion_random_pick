@@ -106,10 +106,10 @@ def reshuffle_card(idx):
     kingdom = st.session_state.kingdom
     filters = st.session_state.filters
 
-    # Keep all but the one being reshuffled
+    # IDs of all other cards (prevent duplicates)
     remaining_ids = kingdom.drop(idx)["id"].tolist()
 
-    # Draw 1 new card not in remaining_ids
+    # Fetch one replacement card
     query, params = build_query(
         filters["selected_sets"],
         filters["selected_types"],
@@ -118,11 +118,10 @@ def reshuffle_card(idx):
     )
     replacement = pd.read_sql_query(query, conn, params=params)
 
-    # Replace the card
-    new_kingdom = kingdom.drop(idx).reset_index(drop=True)
-    new_kingdom = pd.concat([new_kingdom, replacement], ignore_index=True)
+    # Replace the card at the SAME index
+    kingdom.loc[idx] = replacement.iloc[0]
 
-    st.session_state.kingdom = new_kingdom
+    st.session_state.kingdom = kingdom
 
 
 # -------------------------

@@ -12,6 +12,19 @@ st.title("Dominion Kingdom Generator")
 
 # Load available sets and types for the UI
 excluded_types = ['Event', 'Curse']
+
+excluded_card_names = [
+    'Copper',
+    'Silver',
+    'Gold',
+    'Estate',
+    'Duchy',
+    'Province',
+    'Gardens',
+    'Colony',
+    'Curse'
+]
+
 df_sets = pd.read_sql_query("SELECT DISTINCT set_name FROM card_sets ORDER BY set_name", conn)
 df_types = pd.read_sql_query("SELECT DISTINCT type FROM card_types ORDER BY type", conn)
 
@@ -39,6 +52,12 @@ if st.button("Generate Kingdom"):
     """.format(",".join(["?"] * len(excluded_types)))
     params = excluded_types.copy()
 
+    # Filter by excluded card names
+    if excluded_card_names:
+        query += " AND c.name NOT IN ({})".format(
+            ",".join(["?"] * len(excluded_card_names))
+        )
+        params += excluded_card_names
 
     # Filter by selected sets
     if selected_sets:

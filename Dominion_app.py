@@ -44,43 +44,45 @@ all_types = sorted([t for t in df_types["type"].tolist() if t not in excluded_ty
 # -------------------------
 # Function: base query builder
 # -------------------------
-def build_query(selected_sets, selected_types, excluded_ids=None, limit=None):
+def build_query(
+    selected_sets, 
+    selected_types, 
+    excluded_ids=None, 
+    limit=None, 
+    extra_conditions="", 
+    excluded_types=None, 
+    excluded_card_names=None
+):
+    if excluded_types is None:
+        excluded_types = []
+    if excluded_card_names is None:
+        excluded_card_names = []
+
     query = """
     SELECT DISTINCT c.id, c.name, c.types, c.cost, cs.set_name, c.text
     FROM cards c
     JOIN card_sets cs ON c.id = cs.card_id
     JOIN card_types ct ON c.id = ct.card_id
     WHERE 1=1
-    AND c.id NOT IN (
-        SELECT card_id FROM card_types
-        WHERE type IN ({}))
-    """.format(",".join(["?"] * len(excluded_types)))
+    """
+    params = []
 
-    params = excluded_types.copy()
+    # Exclude types
+    if excluded_types:
+        query += " AND c.id NOT IN (SELECT card_id FROM card_types WHERE type IN ({}))".format(
+            ",".join(["?"] * len(excluded_types))
+        )
+        params += excluded_types
 
-    # Excluded card names
+    # Exclude specific card names
     if excluded_card_names:
         query += " AND c.name NOT IN ({})".format(",".join(["?"] * len(excluded_card_names)))
         params += excluded_card_names
 
-    # Filter by set
-    if selected_sets:
-        query += " AND cs.set_name IN ({})".format(",".join(["?"] * len(selected_sets)))
-        params += selected_sets
-
-    # Filter by selected card types
-    if selected_types:
-        query += """
-        AND c.id IN (
-            SELECT card_id FROM card_types
-            WHERE type IN ({}))
-        """.format(",".join(["?"] * len(selected_types)))
-        params += selected_types
-
-    # Exclude specific IDs (important when reshuffling)
-    if excluded_ids:
-        query += " AND c.id NOT IN ({})".format(",".join(["?"] * len(excluded_ids)))
-        params += excluded_ids
+    
+    # Add extra condition BEFORE random/limit
+    if extra_conditions:
+        query += " AND " + extra_conditions
 
     # Randomize & limit if needed
     query += " ORDER BY RANDOM()"
@@ -91,12 +93,61 @@ def build_query(selected_sets, selected_types, excluded_ids=None, limit=None):
     return query, params
 
 
+def get_random_card_with_cost(selected_sets, selected_types, cost, excluded_ids=None):
+    # Build numeric cost filter as extra condition
+    extra = f"CAST(REPLACE(c.cost, '$', '') AS INTEGER) = {cost}"
+    query, params = build_query(
+        selected_sets,
+        selected_types,
+        excluded_ids=excluded_ids,
+        limit=1,
+        extra_conditions=extra,
+        excluded_types=excluded_types,
+        excluded_card_names=excluded_card_names
+    )
+
+    return pd.read_sql_query(query, conn, params=params)
+
+
+
+
 # -------------------------
 # Function: generate new kingdom
 # -------------------------
 def generate_kingdom(selected_sets, selected_types, num_cards):
-    query, params = build_query(selected_sets, selected_types, limit=num_cards)
-    return pd.read_sql_query(query, conn, params=params)
+    kingdom_cards = pd.DataFrame()
+
+    # 1. Pick one card with cost 2
+    card2 = get_random_card_with_cost(selected_sets, selected_types, 2)
+    if not card2.empty:
+        kingdom_cards = pd.concat([kingdom_cards, card2], ignore_index=True)
+    else:
+        st.warning("No card with cost 2 found in the selected filters.")
+
+    # 2. Pick one card with cost 3
+    excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
+    card3 = get_random_card_with_cost(selected_sets, selected_types, 3, excluded_ids=excluded_ids)
+    if not card3.empty:
+        kingdom_cards = pd.concat([kingdom_cards, card3], ignore_index=True)
+    else:
+        st.warning("No card with cost 3 found in the selected filters.")
+
+    # 3. Fill remaining slots
+    remaining = num_cards - len(kingdom_cards)
+    if remaining > 0:
+        excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
+        query, params = build_query(
+            selected_sets,
+            selected_types,
+            excluded_ids=excluded_ids,
+            limit=remaining,
+            excluded_types=excluded_types,
+            excluded_card_names=excluded_card_names
+        )
+        remaining_cards = pd.read_sql_query(query, conn, params=params)
+        kingdom_cards = pd.concat([kingdom_cards, remaining_cards], ignore_index=True)
+
+    return kingdom_cards
 
 
 # -------------------------
@@ -114,8 +165,11 @@ def reshuffle_card(idx):
         filters["selected_sets"],
         filters["selected_types"],
         excluded_ids=remaining_ids,
-        limit=1
+        limit=1,
+        excluded_types=excluded_types,
+        excluded_card_names=excluded_card_names
     )
+
     replacement = pd.read_sql_query(query, conn, params=params)
 
     # Replace the card at the SAME index

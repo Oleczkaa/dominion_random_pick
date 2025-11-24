@@ -32,8 +32,13 @@ if st.button("Generate Kingdom"):
     JOIN card_sets cs ON c.id = cs.card_id
     JOIN card_types ct ON c.id = ct.card_id
     WHERE 1=1
-    """
-    params = []
+    AND c.id NOT IN (
+        SELECT card_id FROM card_types
+        WHERE type IN ({})
+    )
+    """.format(",".join(["?"] * len(excluded_types)))
+    params = excluded_types.copy()
+
 
     # Filter by selected sets
     if selected_sets:

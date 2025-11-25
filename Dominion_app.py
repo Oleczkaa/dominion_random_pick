@@ -5,7 +5,7 @@
 # matching those filters. Each card in the kingdom can be reshuffled individually for more variety.
 #
 # Data Source:
-#   - The card info comes from file "cards.json". 
+#   - Card information is originally sourced from "cards.json" and imported into the SQLite database.
 #   - Card details are stored in a SQLite database 'dominion.db', with tables for cards, card_types, and card_sets.
 #
 # Features:

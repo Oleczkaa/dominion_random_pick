@@ -251,14 +251,14 @@ if st.session_state.kingdom is not None:
     st.markdown("### Card List (click 🔄 to reshuffle one):")
 
     for idx, row in df.iterrows():
-        col1, col2 = st.columns([4, 1])
+        col1, col2 = st.columns([0.15, 4])
         with col1:
-            st.markdown(f"- **{row['name']}** — *{row['set_name']}* ({row['types']})")
-
+            st.button("🔄", key=f"reshuffle_{idx}", help="Reshuffle this card")
         with col2:
-            if st.button("🔄", key=f"reshuffle_{idx}"):
-                reshuffle_card(idx)
-                st.rerun()
+            st.markdown(f"**{row['name']}** — *{row['set_name']}* ({row['types']})")
+        if st.session_state.get(f"reshuffle_{idx}"):
+            reshuffle_card(idx)
+            st.rerun()
 
 
 # Close DB when Streamlit stops

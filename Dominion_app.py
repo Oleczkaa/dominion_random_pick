@@ -1,3 +1,19 @@
+# Goal: Have a website that allows to generate random cards for the board game 
+# dominion, with filters for expansions and card types.
+#
+# Background: The card info comes from file "cards.json". You have a database 
+# 'dominion.db' with tables for cards, card_types, and card_sets. You want to 
+# build a Streamlit app that allows users to select expansions (sets) and 
+# card types as filters, and then generate a random kingdom of cards based 
+# on those filters. The app should also allow reshuffling individual cards
+# in the generated kingdom.
+#
+# Requierements: 
+#     - This is a training project for a beginner in programming, SQL, 
+#       Python and Streamlit. Make sure the code is clear and well commented. 
+#       Explain each step with comments.
+# 
+
 import sqlite3
 import streamlit as st
 import pandas as pd

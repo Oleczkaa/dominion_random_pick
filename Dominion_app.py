@@ -67,6 +67,13 @@ def build_query(
     """
     params = []
 
+    # Filter by selected sets (expansions)
+    if selected_sets:
+        query += " AND cs.set_name IN ({})".format(
+            ",".join(["?"] * len(selected_sets))
+        )
+        params += selected_sets
+
     # Exclude types
     if excluded_types:
         query += " AND c.id NOT IN (SELECT card_id FROM card_types WHERE type IN ({}))".format(
@@ -79,7 +86,6 @@ def build_query(
         query += " AND c.name NOT IN ({})".format(",".join(["?"] * len(excluded_card_names)))
         params += excluded_card_names
 
-    
     # Add extra condition BEFORE random/limit
     if extra_conditions:
         query += " AND " + extra_conditions

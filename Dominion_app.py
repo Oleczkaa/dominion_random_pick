@@ -220,7 +220,7 @@ def reshuffle_card(idx):
 # -------------------------
 # Filters UI
 # -------------------------
-preselected_sets = ["Base", "Prosperity", "Plunder"]
+preselected_sets = ["Base", "Prosperity", "Plunder", "Empires"]
 selected_sets = st.multiselect("Choose expansions:", options=all_sets, default=preselected_sets)
 selected_types = st.multiselect("Choose card types:", all_types)
 num_cards = st.slider("How many cards do you want?", 1, 15, 10)

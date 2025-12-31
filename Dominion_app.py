@@ -163,60 +163,55 @@ def get_random_card_with_cost(selected_sets, selected_types, cost, excluded_ids=
 def generate_kingdom(selected_sets, selected_types, num_cards):
     kingdom_cards = pd.DataFrame()
 
+    # Track already-picked card names to prevent duplicates (Castle or any other)
+    picked_names = []
+
+    # -------------------------
     # 1. Pick one card with cost 2
-    card2 = get_random_card_with_cost(selected_sets, selected_types, 2)
+    # -------------------------
+    excluded_ids = None
+    card2 = get_random_card_with_cost(selected_sets, selected_types, 2, excluded_ids=excluded_ids)
     if not card2.empty:
         kingdom_cards = pd.concat([kingdom_cards, card2], ignore_index=True)
+        picked_names.extend(card2["name"].tolist())  # <-- NEW: track names picked
     else:
         st.warning("No card with cost 2 found in the selected filters.")
 
+    # -------------------------
     # 2. Pick one card with cost 3
+    # -------------------------
     excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
     card3 = get_random_card_with_cost(selected_sets, selected_types, 3, excluded_ids=excluded_ids)
     if not card3.empty:
         kingdom_cards = pd.concat([kingdom_cards, card3], ignore_index=True)
+        picked_names.extend(card3["name"].tolist())  # <-- track names
     else:
         st.warning("No card with cost 3 found in the selected filters.")
 
+    # -------------------------
     # 3. Fill remaining slots
+    # -------------------------
     remaining = num_cards - len(kingdom_cards)
-    if remaining > 0:
-        excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
-        excluded_names = kingdom_cards["name"].tolist()  # <-- NEW: exclude names already in kingdom (like Castle)
+    while remaining > 0:
+        excluded_ids = kingdom_cards["id"].tolist()
+        # <-- NEW: exclude names already in kingdom
         query, params = build_query(
             selected_sets,
             selected_types,
             excluded_ids=excluded_ids,
             limit=remaining,
             excluded_types=excluded_types,
-            excluded_card_names=excluded_card_names + excluded_names  # <-- prevent duplicates by name
+            excluded_card_names=excluded_card_names + picked_names
         )
-        remaining_cards = pd.read_sql_query(query, conn, params=params)
-        kingdom_cards = pd.concat([kingdom_cards, remaining_cards], ignore_index=True)
-
-    # ---- Remove duplicates by name (like Castle) ----
-    kingdom_cards = kingdom_cards.drop_duplicates(subset=["name"])
-
-    # ---- Fill back missing cards if kingdom is shorter than requested ----
-    missing = num_cards - len(kingdom_cards)
-    if missing > 0:
-        excluded_ids = kingdom_cards["id"].tolist()
-        excluded_names = kingdom_cards["name"].tolist()  # <-- also exclude names already in kingdom
-        query, params = build_query(
-            selected_sets,
-            selected_types,
-            excluded_ids=excluded_ids,
-            limit=missing,
-            excluded_types=excluded_types,
-            excluded_card_names=excluded_card_names + excluded_names
-        )
-        extra_cards = pd.read_sql_query(query, conn, params=params)
-        kingdom_cards = pd.concat([kingdom_cards, extra_cards], ignore_index=True)
+        new_cards = pd.read_sql_query(query, conn, params=params)
+        if new_cards.empty:
+            # No more cards available, stop filling
+            break
+        kingdom_cards = pd.concat([kingdom_cards, new_cards], ignore_index=True)
+        picked_names.extend(new_cards["name"].tolist())  # <-- update names
+        remaining = num_cards - len(kingdom_cards)  # recalc remaining
 
     return kingdom_cards
-
-
-
 
 # -------------------------
 # Function: reshuffle one card

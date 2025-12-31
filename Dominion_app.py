@@ -79,7 +79,16 @@ def build_query(
         excluded_card_names = []
 
     query = """
-    SELECT DISTINCT c.id, c.name, c.types, c.cost, cs.set_name, c.text
+    SELECT DISTINCT 
+        c.id,
+        CASE 
+            WHEN c.name LIKE '%Castle%' THEN 'Castle'
+            ELSE c.name
+        END AS name,
+        c.types,
+        c.cost,
+        cs.set_name,
+        c.text
     FROM cards c
     JOIN card_sets cs ON c.id = cs.card_id
     JOIN card_types ct ON c.id = ct.card_id

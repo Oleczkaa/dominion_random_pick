@@ -182,13 +182,14 @@ def generate_kingdom(selected_sets, selected_types, num_cards):
     remaining = num_cards - len(kingdom_cards)
     if remaining > 0:
         excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
+        excluded_names = kingdom_cards["name"].tolist()  # <-- NEW: exclude names already in kingdom (like Castle)
         query, params = build_query(
             selected_sets,
             selected_types,
             excluded_ids=excluded_ids,
             limit=remaining,
             excluded_types=excluded_types,
-            excluded_card_names=excluded_card_names
+            excluded_card_names=excluded_card_names + excluded_names  # <-- prevent duplicates by name
         )
         remaining_cards = pd.read_sql_query(query, conn, params=params)
         kingdom_cards = pd.concat([kingdom_cards, remaining_cards], ignore_index=True)
@@ -200,18 +201,20 @@ def generate_kingdom(selected_sets, selected_types, num_cards):
     missing = num_cards - len(kingdom_cards)
     if missing > 0:
         excluded_ids = kingdom_cards["id"].tolist()
+        excluded_names = kingdom_cards["name"].tolist()  # <-- also exclude names already in kingdom
         query, params = build_query(
             selected_sets,
             selected_types,
             excluded_ids=excluded_ids,
             limit=missing,
             excluded_types=excluded_types,
-            excluded_card_names=excluded_card_names
+            excluded_card_names=excluded_card_names + excluded_names
         )
         extra_cards = pd.read_sql_query(query, conn, params=params)
         kingdom_cards = pd.concat([kingdom_cards, extra_cards], ignore_index=True)
 
     return kingdom_cards
+
 
 
 

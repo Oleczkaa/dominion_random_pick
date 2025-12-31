@@ -46,7 +46,7 @@ st.title("Dominion Kingdom Generator")
 # -------------------------
 # Load sets and types
 # -------------------------
-excluded_types = ['Event', 'Curse']
+excluded_types = ['Event', 'Curse', 'Landmark']
 
 excluded_card_names = [
     'Copper', 'Silver', 'Gold',

@@ -18,6 +18,11 @@
 #   - The code is written to be clear and well-commented for educational purposes.
 #
 
+# Dominion Kingdom Generator Web App
+#
+# This Streamlit app generates a random Dominion kingdom of cards.
+# Each card name appears only once (including "Castle" cards).
+
 import sqlite3
 import streamlit as st
 import pandas as pd
@@ -37,7 +42,6 @@ if "kingdom" not in st.session_state:
 if "filters" not in st.session_state:
     st.session_state.filters = None
 
-
 # -------------------------
 # UI Title
 # -------------------------
@@ -47,7 +51,6 @@ st.title("Dominion Kingdom Generator")
 # Load sets and types
 # -------------------------
 excluded_types = ['Event', 'Curse', 'Landmark']
-
 excluded_card_names = [
     'Copper', 'Silver', 'Gold',
     'Estate', 'Duchy', 'Province', 'Gardens',
@@ -60,7 +63,6 @@ df_types = pd.read_sql_query("SELECT DISTINCT type FROM card_types ORDER BY type
 all_sets = sorted(df_sets["set_name"].tolist())
 all_types = sorted([t for t in df_types["type"].tolist() if t not in excluded_types])
 
-
 # -------------------------
 # Function: base query builder
 # -------------------------
@@ -68,6 +70,7 @@ def build_query(
     selected_sets, 
     selected_types, 
     excluded_ids=None, 
+    excluded_names=None, 
     limit=None, 
     extra_conditions="", 
     excluded_types=None, 
@@ -77,8 +80,9 @@ def build_query(
         excluded_types = []
     if excluded_card_names is None:
         excluded_card_names = []
+    if excluded_names is None:
+        excluded_names = []
 
-    # First collapse Castle cards into one logical row
     query = """
     SELECT *
     FROM (
@@ -98,7 +102,6 @@ def build_query(
     ) AS x
     WHERE 1=1
     """
-
     params = []
 
     # Filter expansions
@@ -106,28 +109,33 @@ def build_query(
         query += " AND x.set_name IN ({})".format(",".join(["?"] * len(selected_sets)))
         params += selected_sets
 
-    # Exclude types (Events, Landmarks, etc.)
+    # Exclude types
     if excluded_types:
         query += """
         AND x.id NOT IN (
-            SELECT card_id FROM card_types WHERE type IN ({})
+            SELECT card_id FROM card_types WHERE type IN ({} )
         )
         """.format(",".join(["?"] * len(excluded_types)))
         params += excluded_types
 
-    # Exclude fixed cards (Copper etc.)
+    # Exclude fixed card names
     if excluded_card_names:
         query += " AND x.name NOT IN ({})".format(",".join(["?"] * len(excluded_card_names)))
         params += excluded_card_names
 
-    # Apply special filters (like cost)
-    if extra_conditions:
-        query += " AND " + extra_conditions
+    # Exclude already-picked names
+    if excluded_names:
+        query += " AND x.name NOT IN ({})".format(",".join(["?"] * len(excluded_names)))
+        params += excluded_names
 
-    # Prevent duplicate picks across queries
+    # Exclude IDs
     if excluded_ids:
         query += " AND x.id NOT IN ({})".format(",".join(["?"] * len(excluded_ids)))
         params += excluded_ids
+
+    # Extra conditions (e.g., cost)
+    if extra_conditions:
+        query += " AND " + extra_conditions
 
     # Random + limit
     query += " ORDER BY RANDOM()"
@@ -137,79 +145,54 @@ def build_query(
 
     return query, params
 
-
-
-def get_random_card_with_cost(selected_sets, selected_types, cost, excluded_ids=None):
-    # Build numeric cost filter as extra condition
-    extra = f"CAST(REPLACE(x.cost, '$', '') AS INTEGER) = {cost}"
+# -------------------------
+# Function: get random card
+# -------------------------
+def get_random_card(selected_sets, selected_types, cost=None, excluded_ids=None, excluded_names=None):
+    extra = ""
+    if cost is not None:
+        extra = f"CAST(REPLACE(x.cost, '$', '') AS INTEGER) = {cost}"
     query, params = build_query(
         selected_sets,
         selected_types,
         excluded_ids=excluded_ids,
+        excluded_names=excluded_names,
         limit=1,
         extra_conditions=extra,
         excluded_types=excluded_types,
         excluded_card_names=excluded_card_names
     )
-
     return pd.read_sql_query(query, conn, params=params)
 
-
-
-
 # -------------------------
-# Function: generate new kingdom
+# Function: generate kingdom
 # -------------------------
 def generate_kingdom(selected_sets, selected_types, num_cards):
     kingdom_cards = pd.DataFrame()
-
-    # Track already-picked card names to prevent duplicates (Castle or any other)
     picked_names = []
 
-    # -------------------------
-    # 1. Pick one card with cost 2
-    # -------------------------
-    excluded_ids = None
-    card2 = get_random_card_with_cost(selected_sets, selected_types, 2, excluded_ids=excluded_ids)
+    # Pick one card with cost 2
+    card2 = get_random_card(selected_sets, selected_types, cost=2, excluded_names=picked_names)
     if not card2.empty:
         kingdom_cards = pd.concat([kingdom_cards, card2], ignore_index=True)
-        picked_names.extend(card2["name"].tolist())  # <-- NEW: track names picked
-    else:
-        st.warning("No card with cost 2 found in the selected filters.")
+        picked_names.extend(card2["name"].tolist())
 
-    # -------------------------
-    # 2. Pick one card with cost 3
-    # -------------------------
-    excluded_ids = kingdom_cards["id"].tolist() if not kingdom_cards.empty else None
-    card3 = get_random_card_with_cost(selected_sets, selected_types, 3, excluded_ids=excluded_ids)
+    # Pick one card with cost 3
+    card3 = get_random_card(selected_sets, selected_types, cost=3, excluded_ids=kingdom_cards["id"].tolist(), excluded_names=picked_names)
     if not card3.empty:
         kingdom_cards = pd.concat([kingdom_cards, card3], ignore_index=True)
-        picked_names.extend(card3["name"].tolist())  # <-- track names
-    else:
-        st.warning("No card with cost 3 found in the selected filters.")
+        picked_names.extend(card3["name"].tolist())
 
-    # -------------------------
-    # 3. Fill remaining slots
-    # -------------------------
+    # Fill remaining slots
     remaining = num_cards - len(kingdom_cards)
     while remaining > 0:
         excluded_ids = kingdom_cards["id"].tolist()
-        # <-- NEW: exclude names already in kingdom
-        query, params = build_query(
-            selected_sets,
-            selected_types,
-            excluded_ids=excluded_ids,
-            limit=remaining,
-            excluded_types=excluded_types,
-            excluded_card_names=excluded_card_names + picked_names
-        )
-        new_cards = pd.read_sql_query(query, conn, params=params)
-        if new_cards.empty:
-            # No more cards available, stop filling
+        new_card = get_random_card(selected_sets, selected_types, excluded_ids=excluded_ids, excluded_names=picked_names)
+        if new_card.empty:
             break
-        kingdom_cards = pd.concat([kingdom_cards, new_cards], ignore_index=True)
-        picked_names.extend(new_cards["name"].tolist())  # <-- update names
-        remaining = num_cards - len(kingdom_cards)  # recalc remaining
+        kingdom_cards = pd.concat([kingdom_cards, new_card], ignore_index=True)
+        picked_names.extend(new_card["name"].tolist())
+        remaining = num_cards - len(kingdom_cards)
 
     return kingdom_cards
 
@@ -220,39 +203,25 @@ def reshuffle_card(idx):
     kingdom = st.session_state.kingdom
     filters = st.session_state.filters
 
-    # IDs of all other cards (prevent duplicates)
     remaining_ids = kingdom.drop(idx)["id"].tolist()
+    remaining_names = kingdom.drop(idx)["name"].tolist()
 
-    # Fetch one replacement card
-    query, params = build_query(
+    replacement = get_random_card(
         filters["selected_sets"],
         filters["selected_types"],
         excluded_ids=remaining_ids,
-        limit=1,
-        excluded_types=excluded_types,
-        excluded_card_names=excluded_card_names
+        excluded_names=remaining_names
     )
 
-    replacement = pd.read_sql_query(query, conn, params=params)
-
-    # Replace the card at the SAME index
-    kingdom.loc[idx] = replacement.iloc[0]
-    # Prevent duplicates like Castle showing up twice
-    kingdom = kingdom.drop_duplicates(subset=["name"])
-    st.session_state.kingdom = kingdom
-
+    if not replacement.empty:
+        kingdom.loc[idx] = replacement.iloc[0]
+        st.session_state.kingdom = kingdom
 
 # -------------------------
 # Filters UI
 # -------------------------
-preselected_sets = ["Base", "Prosperity", "Plunder"]  # change to your desired expansions
-selected_sets = st.multiselect(
-    "Choose expansions:",
-    options=all_sets,
-    default=preselected_sets
-)
-
-
+preselected_sets = ["Base", "Prosperity", "Plunder"]
+selected_sets = st.multiselect("Choose expansions:", options=all_sets, default=preselected_sets)
 selected_types = st.multiselect("Choose card types:", all_types)
 num_cards = st.slider("How many cards do you want?", 1, 15, 10)
 
@@ -265,20 +234,16 @@ if st.button("Generate Kingdom"):
         "selected_types": selected_types,
         "num_cards": num_cards
     }
-
     st.session_state.kingdom = generate_kingdom(selected_sets, selected_types, num_cards)
-    st.rerun()  # Important: stabilizes the session state
-
+    st.rerun()
 
 # -------------------------
 # Display Kingdom + Reshuffle Buttons
 # -------------------------
 if st.session_state.kingdom is not None:
     st.subheader("🎴 Generated Kingdom")
-
     df = st.session_state.kingdom
 
-    # Table of all cards
     st.data_editor(
         df[["name", "types", "set_name", "cost", "text"]],
         column_config={"text": st.column_config.TextColumn("Card Text", max_chars=1800)},
@@ -298,6 +263,6 @@ if st.session_state.kingdom is not None:
             reshuffle_card(idx)
             st.rerun()
 
-
-# Close DB when Streamlit stops
+# Close DB
 conn.close()
+

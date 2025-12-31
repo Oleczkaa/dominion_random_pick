@@ -193,9 +193,26 @@ def generate_kingdom(selected_sets, selected_types, num_cards):
         remaining_cards = pd.read_sql_query(query, conn, params=params)
         kingdom_cards = pd.concat([kingdom_cards, remaining_cards], ignore_index=True)
 
-    # Make sure Castle only appears once by name
+    # ---- Remove duplicates by name (like Castle) ----
     kingdom_cards = kingdom_cards.drop_duplicates(subset=["name"])
+
+    # ---- Fill back missing cards if kingdom is shorter than requested ----
+    missing = num_cards - len(kingdom_cards)
+    if missing > 0:
+        excluded_ids = kingdom_cards["id"].tolist()
+        query, params = build_query(
+            selected_sets,
+            selected_types,
+            excluded_ids=excluded_ids,
+            limit=missing,
+            excluded_types=excluded_types,
+            excluded_card_names=excluded_card_names
+        )
+        extra_cards = pd.read_sql_query(query, conn, params=params)
+        kingdom_cards = pd.concat([kingdom_cards, extra_cards], ignore_index=True)
+
     return kingdom_cards
+
 
 
 # -------------------------

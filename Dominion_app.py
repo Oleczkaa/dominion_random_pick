@@ -222,7 +222,8 @@ def reshuffle_card(idx):
 
     # Replace the card at the SAME index
     kingdom.loc[idx] = replacement.iloc[0]
-
+    # Prevent duplicates like Castle showing up twice
+    kingdom = kingdom.drop_duplicates(subset=["name"])
     st.session_state.kingdom = kingdom
 
 

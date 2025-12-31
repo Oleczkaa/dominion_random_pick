@@ -78,10 +78,11 @@ def build_query(
     if excluded_card_names is None:
         excluded_card_names = []
 
+    # First collapse Castle cards into one logical row
     query = """
     SELECT *
     FROM (
-        SELECT DISTINCT 
+        SELECT DISTINCT
             c.id,
             CASE 
                 WHEN c.name LIKE '%Castle%' THEN 'Castle'
@@ -94,36 +95,41 @@ def build_query(
         FROM cards c
         JOIN card_sets cs ON c.id = cs.card_id
         JOIN card_types ct ON c.id = ct.card_id
-        WHERE 1=1
     ) AS x
+    WHERE 1=1
     """
 
     params = []
 
-    # Filter by selected sets (expansions)
+    # Filter expansions
     if selected_sets:
-        query += " AND cs.set_name IN ({})".format(
-            ",".join(["?"] * len(selected_sets))
-        )
+        query += " AND x.set_name IN ({})".format(",".join(["?"] * len(selected_sets)))
         params += selected_sets
 
-    # Exclude types
+    # Exclude types (Events, Landmarks, etc.)
     if excluded_types:
-        query += " AND c.id NOT IN (SELECT card_id FROM card_types WHERE type IN ({}))".format(
-            ",".join(["?"] * len(excluded_types))
+        query += """
+        AND x.id NOT IN (
+            SELECT card_id FROM card_types WHERE type IN ({})
         )
+        """.format(",".join(["?"] * len(excluded_types)))
         params += excluded_types
 
-    # Exclude specific card names
+    # Exclude fixed cards (Copper etc.)
     if excluded_card_names:
-        query += " AND c.name NOT IN ({})".format(",".join(["?"] * len(excluded_card_names)))
+        query += " AND x.name NOT IN ({})".format(",".join(["?"] * len(excluded_card_names)))
         params += excluded_card_names
 
-    # Add extra condition BEFORE random/limit
+    # Apply special filters (like cost)
     if extra_conditions:
         query += " AND " + extra_conditions
 
-    # Randomize & limit if needed
+    # Prevent duplicate picks across queries
+    if excluded_ids:
+        query += " AND x.id NOT IN ({})".format(",".join(["?"] * len(excluded_ids)))
+        params += excluded_ids
+
+    # Random + limit
     query += " ORDER BY RANDOM()"
     if limit:
         query += " LIMIT ?"
@@ -132,9 +138,10 @@ def build_query(
     return query, params
 
 
+
 def get_random_card_with_cost(selected_sets, selected_types, cost, excluded_ids=None):
     # Build numeric cost filter as extra condition
-    extra = f"CAST(REPLACE(c.cost, '$', '') AS INTEGER) = {cost}"
+    extra = f"CAST(REPLACE(x.cost, '$', '') AS INTEGER) = {cost}"
     query, params = build_query(
         selected_sets,
         selected_types,
@@ -186,6 +193,8 @@ def generate_kingdom(selected_sets, selected_types, num_cards):
         remaining_cards = pd.read_sql_query(query, conn, params=params)
         kingdom_cards = pd.concat([kingdom_cards, remaining_cards], ignore_index=True)
 
+    # Make sure Castle only appears once by name
+    kingdom_cards = kingdom_cards.drop_duplicates(subset=["name"])
     return kingdom_cards
 
 
